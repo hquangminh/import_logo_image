@@ -1,0 +1,20 @@
+.button_drag_image {
+  font-size: 12px;
+  text-align: center;
+}
+.container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  border: 1px solid black;
+  margin-bottom: 20px;
+}
+.button_download {
+  padding: 10px;
+  background-color: blue;
+  color: white;
+  font-size: medium;
+}
