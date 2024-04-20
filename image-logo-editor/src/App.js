@@ -37,6 +37,11 @@ function App() {
     let imagesProcessed = 0
 
     images.forEach((image, index) => {
+      if (!containerRefs.current[index]) {
+        console.error(`Container for image ${image.id} is not defined.`)
+        return
+      }
+
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       const img = new Image()
@@ -45,19 +50,34 @@ function App() {
       img.onload = () => {
         canvas.width = img.naturalWidth
         canvas.height = img.naturalHeight
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0)
 
         const logo = logos[image.id]
         if (logo) {
           const logoImg = new Image()
           logoImg.src = logo
-          logoImg.onload = () => {
-            // Use the recorded size and position
-            const position = logoPositions[image.id]
-            const size = logoSizes[image.id]
 
-            // Draw the logo on the canvas
-            ctx.drawImage(logoImg, position.x, position.y, size.width, size.height)
+          logoImg.onload = () => {
+            // Ensure container and logo details are available
+            const container = containerRefs.current[index]
+            if (!container) {
+              console.error(`Container for image ${image.id} is not defined.`)
+              return
+            }
+
+            const scaleX = img.naturalWidth / container.offsetWidth
+            const scaleY = img.naturalHeight / container.offsetHeight
+            const logoPosition = logoPositions[image.id]
+            const logoSize = logoSizes[image.id]
+
+            // Use the user-set dimensions directly, applying the scale
+            const logoWidth = logoSize ? logoSize.width * scaleX : logoImg.naturalWidth
+            const logoHeight = logoSize ? logoSize.height * scaleY : logoImg.naturalHeight
+            const posX = logoPosition ? logoPosition.x * scaleX : 0
+            const posY = logoPosition ? logoPosition.y * scaleY : 0
+
+            // Now draw the logo at the correct position and size
+            ctx.drawImage(logoImg, posX, posY, logoWidth, logoHeight)
             finalizeImage()
           }
         } else {
@@ -92,10 +112,20 @@ function App() {
       </Dropzone>
       {images.map((image, index) => (
         <div className='container' key={image.id} ref={(el) => (containerRefs.current[index] = el)}>
-          <img src={image.src} alt='Background' className='image' />
+          <img src={image.src} alt={`Background ${index}`} style={{ maxWidth: '100%', maxHeight: '100%', position: 'absolute' }} />
           <Dropzone onDrop={(files) => handleLogoDrop(image.id, files)}>
             {({ getRootProps, getInputProps }) => (
-              <div {...getRootProps()} className='dropzone'>
+              <div
+                {...getRootProps()}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.5)',
+                }}>
                 <input {...getInputProps()} />
                 {!logos[image.id] && <p>Drag 'n' drop a logo here, or click to select a logo</p>}
               </div>
@@ -103,41 +133,27 @@ function App() {
           </Dropzone>
           {logos[image.id] && (
             <Rnd
-              bounds='parent'
-              size={logoSizes[image.id]}
-              position={logoPositions[image.id]}
-              onDragStop={(e, d) => {
-                const container = containerRefs.current[index]
-                // Calculate relative position
-                setLogoPositions((prev) => ({
-                  ...prev,
-                  [image.id]: { x: (d.x / container.offsetWidth) * img.naturalWidth, y: (d.y / container.offsetHeight) * img.naturalHeight },
-                }))
-              }}
-              onResizeStop={(e, direction, ref, delta, position) => {
-                const container = containerRefs.current[index]
-                // Calculate relative size
-                setLogoSizes((prev) => ({
-                  ...prev,
-                  [image.id]: {
-                    width: (ref.offsetWidth / container.offsetWidth) * img.naturalWidth,
-                    height: (ref.offsetHeight / container.offsetHeight) * img.naturalHeight,
-                  },
-                }))
-                // Calculate relative position
-                setLogoPositions((prev) => ({
-                  ...prev,
-                  [image.id]: {
-                    x: (position.x / container.offsetWidth) * img.naturalWidth,
-                    y: (position.y / container.offsetHeight) * img.naturalHeight,
-                  },
-                }))
-              }}
               style={{
                 position: 'absolute',
                 zIndex: 10,
                 border: '1px solid #ddd',
                 background: `url(${logos[image.id]}) no-repeat center / contain`,
+              }}
+              size={logoSizes[image.id] || { width: 100, height: 100 }}
+              position={logoPositions[image.id] || { x: 50, y: 50 }}
+              bounds='parent'
+              onDragStop={(e, d) => {
+                setLogoPositions((prev) => ({ ...prev, [image.id]: { x: d.x, y: d.y } }))
+              }}
+              onResizeStop={(e, direction, ref, delta, position) => {
+                setLogoSizes((prev) => ({
+                  ...prev,
+                  [image.id]: {
+                    width: ref.offsetWidth,
+                    height: ref.offsetHeight,
+                  },
+                }))
+                setLogoPositions((prev) => ({ ...prev, [image.id]: position }))
               }}
             />
           )}
