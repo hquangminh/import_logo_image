@@ -12,6 +12,8 @@ function App() {
   const [logoSizes, setLogoSizes] = useState({})
   const containerRefs = useRef([])
 
+  console.log('logos', logos)
+
   const handleImageDrop = (acceptedFiles) => {
     acceptedFiles.forEach((file) => {
       const reader = new FileReader()
@@ -27,7 +29,16 @@ function App() {
     const file = acceptedFiles[0]
     const reader = new FileReader()
     reader.onload = (e) => {
-      setLogos((prev) => ({ ...prev, [id]: e.target.result }))
+      const image = new Image()
+      image.onload = () => {
+        const dimensions = {
+          width: image.width,
+          height: image.height,
+        }
+
+        setLogos((prev) => ({ ...prev, [id]: { src: e.target.result, size: dimensions } }))
+      }
+      image.src = e.target.result
     }
     reader.readAsDataURL(file)
   }
@@ -37,11 +48,6 @@ function App() {
     let imagesProcessed = 0
 
     images.forEach((image, index) => {
-      if (!containerRefs.current[index]) {
-        console.error(`Container for image ${image.id} is not defined.`)
-        return
-      }
-
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       const img = new Image()
@@ -52,13 +58,12 @@ function App() {
         canvas.height = img.naturalHeight
         ctx.drawImage(img, 0, 0)
 
-        const logo = logos[image.id]
-        if (logo) {
+        const logoInfo = logos[image.id]
+        if (logoInfo) {
           const logoImg = new Image()
-          logoImg.src = logo
+          logoImg.src = logoInfo.src
 
           logoImg.onload = () => {
-            // Ensure container and logo details are available
             const container = containerRefs.current[index]
             if (!container) {
               console.error(`Container for image ${image.id} is not defined.`)
@@ -67,17 +72,16 @@ function App() {
 
             const scaleX = img.naturalWidth / container.offsetWidth
             const scaleY = img.naturalHeight / container.offsetHeight
-            const logoPosition = logoPositions[image.id]
-            const logoSize = logoSizes[image.id]
 
-            // Use the user-set dimensions directly, applying the scale
-            const logoWidth = logoSize ? logoSize.width * scaleX : logoImg.naturalWidth
-            const logoHeight = logoSize ? logoSize.height * scaleY : logoImg.naturalHeight
-            const posX = logoPosition ? logoPosition.x * scaleX : 0
-            const posY = logoPosition ? logoPosition.y * scaleY : 0
+            const logoPosition = logoPositions[image.id] || { x: 0, y: 0 }
+            const logoSize = logoSizes[image.id] || logoInfo.size
 
-            // Now draw the logo at the correct position and size
-            ctx.drawImage(logoImg, posX, posY, logoWidth, logoHeight)
+            const scaledWidth = logoSize.width * scaleX
+            const scaledHeight = logoSize.height * scaleY
+            const posX = logoPosition.x * scaleX
+            const posY = logoPosition.y * scaleY
+
+            ctx.drawImage(logoImg, posX, posY, scaledWidth, scaledHeight)
             finalizeImage()
           }
         } else {
@@ -137,9 +141,9 @@ function App() {
                 position: 'absolute',
                 zIndex: 10,
                 border: '1px solid #ddd',
-                background: `url(${logos[image.id]}) no-repeat center / contain`,
+                background: `url(${logos[image.id].src}) no-repeat center / contain`,
               }}
-              size={logoSizes[image.id] || { width: 100, height: 100 }}
+              size={logoSizes[image.id] || { width: logos[image.id].size.width, height: logos[image.id].size.height }}
               position={logoPositions[image.id] || { x: 50, y: 50 }}
               bounds='parent'
               onDragStop={(e, d) => {
